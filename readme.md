@@ -69,6 +69,198 @@ also be provided: `wxs_bait_interval_list` and `wxs_target_interval_list` for Hs
 `contamination_sites_mu`, `contamination_sites_ud`, `wgs_calling_interval_list`, and
 `wgs_evaluation_interval_list`.
 
+### Staging Inputs:
+The pipeline is build to handle three distinct input types:
+1. BAMs
+1. PE Fastqs
+1. SE Fastqs
+
+Additionally, the workflow supports these three in any combination. You can have PE Fastqs and BAMs,
+PE Fastqs and SE Fastqs, BAMS and PE Fastqs and SE Fastqs, etc. Each of these three classes will be
+procsessed and aligned separately and the resulting BWA aligned bams will be merged into a final BAM
+before performing steps like BQSR and Metrics collection.
+
+#### BAM Inputs
+The BAM processing portion of the pipeline is the simplest when it comes to inputs. You may provide
+a single BAM or many BAMs. The input for BAMs is a file list. In Cavatica or other GUI interfaces,
+simply select the files you wish to process. For command line interfaces such as cwltool, your input
+should look like the following.
+```json
+{
+  ...,
+  "run_pe_reads_processing": false,
+  "run_se_reads_processing": false,
+  "run_bam_processing": true,
+  "input_bam_list": [
+    {
+      "class": "File",
+      "location": "/path/to/bam1.bam"
+    },
+    {
+      "class": "File",
+      "location": "/path/to/bam2.bam"
+    }
+  ],
+  ...
+}
+```
+
+#### SE Fastq Inputs
+SE fastq processing requires more input to build the jobs correctly. Rather than providing a single
+list you must provide two lists: `input_se_reads_list` and `input_se_rgs_list`. The `input_se_reads_list`
+is where you put the files and the `input_se_rgs_list` is where you put your desired BAM @RG headers for
+each reads file. These two lists are must be ordered and of equal length. By ordered, that means the
+first item of the `input_se_rgs_list` will be used when aligning the first item of the `input_se_reads_list`.
+IMPORTANT NOTE: When you are entering the rg names, you need to use a second escape `\` to the tab values `\t`
+as seen below. When the string value is read in by a tool such as cwltool it will interpret a `\\t` input
+as `\t` and a `\t` as the literal `<tab>` value which is not a valid entry for bwa mem.
+If you are using Cavatica GUI, however, no extra escape is necessary. The GUI will add an extra
+escape to any tab values you enter.
+
+In Cavatica make sure to double check that everything is in the right order when you enter the inputs.
+In command line interfaces such as cwltool, your input should look like the following.
+```json
+{
+  ...,
+  "run_pe_reads_processing": false,
+  "run_se_reads_processing": true,
+  "run_bam_processing": false,
+  "input_se_reads_list": [
+    {
+      "class": "File",
+      "location": "/path/to/single1.fastq"
+    },
+    {
+      "class": "File",
+      "location": "/path/to/single2.fastq"
+    }
+  ],
+  "inputs_se_rgs_list": [
+    "@RG\\tID:single1\\tLB:library_name\\tPL:ILLUMINA\\tSM:sample_name",
+    "@RG\\tID:single2\\tLB:library_name\\tPL:ILLUMINA\\tSM:sample_name"
+  ],
+  ...
+}
+```
+Take particular note of how the first item in the rgs list is the metadata for the first item in the fastq list.
+
+#### PE Fastq Inputs
+PE Fastq processing inputs is exactly like SE Fastq processing but requires you to provide the paired mates
+files for your input paired reads. Once again, when using Cavatica make sure your inputs are in the correct
+order. In command line interfaces such as cwltool, your input should look like the following.
+```json
+{
+  ...,
+  "run_pe_reads_processing": true,
+  "run_se_reads_processing": false,
+  "run_bam_processing": false,
+  "input_pe_reads_list": [
+    {
+      "class": "File",
+      "location": "/path/to/sample1_R1.fastq"
+    },
+    {
+      "class": "File",
+      "location": "/path/to/sample2_R1fastq"
+    },
+    {
+      "class": "File",
+      "location": "/path/to/sample3_R1.fastq"
+    }
+  ],
+  "input_pe_mates_list": [
+    {
+      "class": "File",
+      "location": "/path/to/sample1_R2.fastq"
+    },
+    {
+      "class": "File",
+      "location": "/path/to/sample2_R2.fastq"
+    },
+    {
+      "class": "File",
+      "location": "/path/to/sample3_R2.fastq"
+    }
+  ],
+  "inputs_pe_rgs_list": [
+    "@RG\\tID:sample1\\tLB:library_name\\tPL:ILLUMINA\tSM:sample_name",
+    "@RG\\tID:sample2\\tLB:library_name\\tPL:ILLUMINA\tSM:sample_name",
+    "@RG\\tID:sample3\\tLB:library_name\\tPL:ILLUMINA\tSM:sample_name"
+  ],
+  ...
+}
+```
+
+#### Multiple Input Types
+As mentioned above, these three input types can be added in any combination. If you wanted to add
+all three your command line input would look like the following.
+```json
+{
+  ...,
+  "run_pe_reads_processing": true,
+  "run_se_reads_processing": true,
+  "run_bam_processing": true,
+  "input_bam_list": [
+    {
+      "class": "File",
+      "location": "/path/to/bam1.bam"
+    },
+    {
+      "class": "File",
+      "location": "/path/to/bam2.bam"
+    }
+  ],
+  "input_se_reads_list": [
+    {
+      "class": "File",
+      "location": "/path/to/single1.fastq"
+    },
+    {
+      "class": "File",
+      "location": "/path/to/single2.fastq"
+    }
+  ],
+  "inputs_se_rgs_list": [
+    "@RG\\tID:single1\\tLB:library_name\\tPL:ILLUMINA\\tSM:sample_name",
+    "@RG\\tID:single2\\tLB:library_name\\tPL:ILLUMINA\\tSM:sample_name"
+  ],
+  "input_pe_reads_list": [
+    {
+      "class": "File",
+      "location": "/path/to/sample1_R1.fastq"
+    },
+    {
+      "class": "File",
+      "location": "/path/to/sample2_R1fastq"
+    },
+    {
+      "class": "File",
+      "location": "/path/to/sample3_R1.fastq"
+    }
+  ],
+  "input_pe_mates_list": [
+    {
+      "class": "File",
+      "location": "/path/to/sample1_R2.fastq"
+    },
+    {
+      "class": "File",
+      "location": "/path/to/sample2_R2.fastq"
+    },
+    {
+      "class": "File",
+      "location": "/path/to/sample3_R2.fastq"
+    }
+  ],
+  "inputs_pe_rgs_list": [
+    "@RG\\tID:sample1\\tLB:library_name\\tPL:ILLUMINA\\tSM:sample_name",
+    "@RG\\tID:sample2\\tLB:library_name\\tPL:ILLUMINA\\tSM:sample_name",
+    "@RG\\tID:sample3\\tLB:library_name\\tPL:ILLUMINA\\tSM:sample_name"
+  ],
+  ...
+}
+```
+
 ### Example Runtimes:
 1. 120 GB WGS BAM with AggMetrics, WgsMetrics, and gVCF creation: 14 hours & $35
 1. 120 GB WGS BAM only: 11 hours
@@ -89,10 +281,35 @@ also be provided: `wxs_bait_interval_list` and `wxs_target_interval_list` for Hs
    that the first file in `input_pe_reads_list` is run with the first file in `input_pe_mates_list`
    and the first string in `input_pe_rgs_list`. This also means these arrays must be the same
    length or the workflow will fail.
-1. Must have these associated indexes:
-    - knownsite vcfs: Each file requires a `'.tbi'` index
-    - reference fasta: BWA, picard, and samtools indexes (`'.64.amb', '.64.ann', '.64.bwt',
-        '.64.pac', '.64.sa', '.64.alt', '^.dict', '.fai'`)
+1. The input for the reference_tar must be a tar file containing the reference fasta along with its indexes.
+   The required indexes are `[.64.ann,.64.amb,.64.bwt,.64.pac,.64.sa,.dict,.fai]` and are generated by bwa, picard, and samtools.
+   Additionally, an `.64.alt` index is recommended.
+1. If you are making your own bwa indexes make sure to use the `-6` flag to obtain the `.64` version of the
+   indexes. Indexes that do not match this naming schema will cause a failure in certain runner ecosystems.
+1. Should you decide to create your own reference indexes and omit the ALT index file from the reference,
+   or if its naming structure mismatches the other indexes, then your alignments will be equivalent to the results you would
+   obtain if you run BWA-MEM with the -j option.
+1. The following is an example of a complete reference tar input:
+```
+~ tar tf Homo_sapiens_assembly38.tgz
+Homo_sapiens_assembly38.dict
+Homo_sapiens_assembly38.fasta
+Homo_sapiens_assembly38.fasta.64.alt
+Homo_sapiens_assembly38.fasta.64.amb
+Homo_sapiens_assembly38.fasta.64.ann
+Homo_sapiens_assembly38.fasta.64.bwt
+Homo_sapiens_assembly38.fasta.64.pac
+Homo_sapiens_assembly38.fasta.64.sa
+Homo_sapiens_assembly38.fasta.fai
+```
+1. For advanced usage, you can skip the knownsite indexing by providing the knownsites_indexes input.
+   This file list should contain the indexes for each of the files in your knownsites input. Please
+   note this list must be ordered in such a way where the position of the index file in the
+   knownsites_indexes list must correspond with the position of the VCF file in the knownsites list
+   that it indexes. In the example input below you can see that the 1000G_omni2.5.hg38.vcf.gz.tbi
+   file is the fourth item in the knownsites_indexes because the 1000G_omni2.5.hg38.vcf.gz file is the
+   fourth item in the knownsites list. Failure to order in this way will result in the pipeline
+   failing or generating erroneous files.
 1. Turning off gVCF creation and metrics collection for a minimal successful run.
 1. Suggested reference inputs (available from the [Broad Resource Bundle](https://console.cloud.google.com/storage/browser/genomics-public-data/resources/broad/hg38/v0)):
 ```yaml
@@ -100,12 +317,17 @@ contamination_sites_bed: Homo_sapiens_assembly38.contam.bed
 contamination_sites_mu: Homo_sapiens_assembly38.contam.mu
 contamination_sites_ud: Homo_sapiens_assembly38.contam.UD
 dbsnp_vcf: Homo_sapiens_assembly38.dbsnp138.vcf
-indexed_reference_fasta: Homo_sapiens_assembly38.fasta
+reference_tar: Homo_sapiens_assembly38.tgz
 knownsites:
   - Homo_sapiens_assembly38.known_indels.vcf.gz
   - Mills_and_1000G_gold_standard.indels.hg38.vcf.gz
   - 1000G_phase1.snps.high_confidence.hg38.vcf.gz
   - 1000G_omni2.5.hg38.vcf.gz
+knownsites_indexes:
+  - Homo_sapiens_assembly38.known_indels.vcf.gz.tbi
+  - Mills_and_1000G_gold_standard.indels.hg38.vcf.gz.tbi
+  - 1000G_phase1.snps.high_confidence.hg38.vcf.gz.tbi
+  - 1000G_omni2.5.hg38.vcf.gz.tbi
 reference_dict: Homo_sapiens_assembly38.dict
 ```
 

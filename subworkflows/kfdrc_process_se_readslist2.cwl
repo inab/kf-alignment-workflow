@@ -11,7 +11,8 @@ inputs:
   conditional_run: int
   indexed_reference_fasta:
     type: File
-    secondaryFiles: ['.64.amb', '.64.ann', '.64.bwt', '.64.pac', '.64.sa', '.64.alt', '^.dict']
+    secondaryFiles: ['.64.amb', '.64.ann', '.64.bwt', '.64.pac', '.64.sa', '^.dict', '.fai']
+  min_alignment_score: int?
 outputs:
   unsorted_bams: 
     type:
@@ -28,6 +29,7 @@ steps:
       indexed_reference_fasta: indexed_reference_fasta
       input_se_reads: input_se_reads_list
       input_se_rgs: input_se_rgs_list
+      min_alignment_score: min_alignment_score
     scatter: [input_se_reads, input_se_rgs]
     scatterMethod: dotproduct
     out: [unsorted_bams]
